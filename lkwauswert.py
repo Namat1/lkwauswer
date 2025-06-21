@@ -46,7 +46,7 @@ if uploaded_files:
 
         output = io.StringIO()
         df_auswertung.to_csv(output, index=False, sep=";")
-        st.download_button("CSV-Datei herunterladen", output.getvalue(), file_name="LKW_Haeufigkeit_je_Fahrer.csv", mime="text/csv")
+        st.download_button("CSV-Datei herunterladen", output.getvalue(), file_name="2025.csv", mime="text/csv")
 
         st.dataframe(df_auswertung)
     else:
