@@ -49,13 +49,11 @@ if uploaded_files:
                 if not lkw or lkw == "0":
                     continue
 
-                # Fahrer-Paar 1: Spalten 3/4 (D/E)
                 if pd.notnull(row[3]) and pd.notnull(row[4]):
                     nname = str(row[3]).strip().title()
                     vname = str(row[4]).strip().title()
                     eintraege.append((nname, vname, lkw))
 
-                # Fahrer-Paar 2: Spalten 6/7 (G/H)
                 if pd.notnull(row[6]) and pd.notnull(row[7]):
                     nname = str(row[6]).strip().title()
                     vname = str(row[7]).strip().title()
@@ -77,10 +75,8 @@ if uploaded_files:
             df_auswertung.to_csv(tmp.name, index=False, sep=";")
             tmp.flush()
 
-            # Fortschrittsanzeige vorbereiten
             progress_bar = st.progress(0)
 
-            # Upload, wenn Checkbox aktiv ist
             if upload_aktiv:
                 st.write("🔄 Upload läuft...")
                 upload_ok = upload_via_ftp(
@@ -95,11 +91,7 @@ if uploaded_files:
             else:
                 st.info("☑️ Upload nicht aktiviert. Datei wird nur lokal zum Download angeboten.")
 
-            # Download-Button
             with open(tmp.name, "r", encoding="utf-8") as f:
                 st.download_button("⬇️ CSV-Datei herunterladen", f.read(), file_name="2025.csv", mime="text/csv")
-
-        # Tabelle anzeigen
-        st.dataframe(df_auswertung)
     else:
         st.warning("Keine gültigen LKW-Fahrten gefunden.")
