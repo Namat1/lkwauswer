@@ -2,19 +2,19 @@ import streamlit as st
 import pandas as pd
 import tempfile
 from ftplib import FTP
-import time  # für Fortschrittsbalken
+import os
 
 st.title("LKW-Fahrthäufigkeit je Fahrer")
 
 uploaded_files = st.file_uploader("Excel-Dateien hochladen", type=["xlsx"], accept_multiple_files=True)
 
-# Upload-Funktion mit einfachem Fortschrittsbalken
+# Upload-Funktion mit Fortschrittsbalken
 def upload_via_ftp(local_path, remote_name="2025.csv", progress_callback=None):
     try:
         ftp = FTP()
-        ftp.connect(st.secrets["ftp"]["host"], 21)
-        ftp.login(st.secrets["ftp"]["user"], st.secrets["ftp"]["pass"])
-        ftp.cwd("/www/nfc/csv")
+        ftp.connect(st.secrets["FTP_HOST"], 21)
+        ftp.login(st.secrets["FTP_USER"], st.secrets["FTP_PASS"])
+        ftp.cwd(st.secrets["FTP_BASE_DIR"])
 
         file_size = os.path.getsize(local_path)
         uploaded = 0
@@ -49,11 +49,13 @@ if uploaded_files:
                 if not lkw or lkw == "0":
                     continue
 
+                # Fahrer-Paar 1: Spalten 3/4 (D/E)
                 if pd.notnull(row[3]) and pd.notnull(row[4]):
                     nname = str(row[3]).strip().title()
                     vname = str(row[4]).strip().title()
                     eintraege.append((nname, vname, lkw))
 
+                # Fahrer-Paar 2: Spalten 6/7 (G/H)
                 if pd.notnull(row[6]) and pd.notnull(row[7]):
                     nname = str(row[6]).strip().title()
                     vname = str(row[7]).strip().title()
@@ -80,7 +82,7 @@ if uploaded_files:
 
             # Upload, wenn Checkbox aktiv ist
             if upload_aktiv:
-                st.write("🔄 Hochladen läuft...")
+                st.write("🔄 Upload läuft...")
                 upload_ok = upload_via_ftp(
                     tmp.name,
                     "2025.csv",
@@ -89,14 +91,15 @@ if uploaded_files:
                 if upload_ok:
                     st.success("✅ CSV-Datei wurde erfolgreich als 2025.csv per FTP hochgeladen.")
                 else:
-                    st.warning("⚠️ Upload nicht erfolgreich.")
+                    st.warning("⚠️ Upload fehlgeschlagen.")
             else:
-                st.info("☑️ Upload nicht aktiviert. CSV wird nur lokal angeboten.")
+                st.info("☑️ Upload nicht aktiviert. Datei wird nur lokal zum Download angeboten.")
 
-            # Download anbieten
+            # Download-Button
             with open(tmp.name, "r", encoding="utf-8") as f:
                 st.download_button("⬇️ CSV-Datei herunterladen", f.read(), file_name="2025.csv", mime="text/csv")
 
+        # Tabelle anzeigen
         st.dataframe(df_auswertung)
     else:
         st.warning("Keine gültigen LKW-Fahrten gefunden.")
