@@ -2,20 +2,32 @@ import streamlit as st
 import pandas as pd
 import tempfile
 from ftplib import FTP
+import time  # für Fortschrittsbalken
 
 st.title("LKW-Fahrthäufigkeit je Fahrer")
 
 uploaded_files = st.file_uploader("Excel-Dateien hochladen", type=["xlsx"], accept_multiple_files=True)
 
-# FTP-Upload-Funktion
-def upload_via_ftp(local_path, remote_name="2025.csv"):
+# Upload-Funktion mit einfachem Fortschrittsbalken
+def upload_via_ftp(local_path, remote_name="2025.csv", progress_callback=None):
     try:
         ftp = FTP()
         ftp.connect(st.secrets["ftp"]["host"], 21)
         ftp.login(st.secrets["ftp"]["user"], st.secrets["ftp"]["pass"])
         ftp.cwd("/www/nfc/csv")
+
+        file_size = os.path.getsize(local_path)
+        uploaded = 0
+
+        def callback(data):
+            nonlocal uploaded
+            uploaded += len(data)
+            if progress_callback:
+                progress_callback(min(uploaded / file_size, 1.0))
+
         with open(local_path, "rb") as f:
-            ftp.storbinary(f"STOR " + remote_name, f)
+            ftp.storbinary(f"STOR " + remote_name, f, callback=callback)
+
         ftp.quit()
         return True
     except Exception as e:
@@ -23,6 +35,7 @@ def upload_via_ftp(local_path, remote_name="2025.csv"):
         return False
 
 if uploaded_files:
+    upload_aktiv = st.checkbox("✅ Upload aktivieren")
     eintraege = []
 
     for file in uploaded_files:
@@ -36,13 +49,11 @@ if uploaded_files:
                 if not lkw or lkw == "0":
                     continue
 
-                # Fahrer-Paar 1: D/E = Spalten 3/4
                 if pd.notnull(row[3]) and pd.notnull(row[4]):
                     nname = str(row[3]).strip().title()
                     vname = str(row[4]).strip().title()
                     eintraege.append((nname, vname, lkw))
 
-                # Fahrer-Paar 2: G/H = Spalten 6/7
                 if pd.notnull(row[6]) and pd.notnull(row[7]):
                     nname = str(row[6]).strip().title()
                     vname = str(row[7]).strip().title()
@@ -60,22 +71,32 @@ if uploaded_files:
             .sort_values(by=["Nachname", "Vorname", "Anzahl Fahrten"], ascending=[True, True, False])
         )
 
-        # CSV in temporäre Datei schreiben
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".csv", delete=False, encoding="utf-8") as tmp:
             df_auswertung.to_csv(tmp.name, index=False, sep=";")
             tmp.flush()
 
-            # FTP-Upload
-            if upload_via_ftp(tmp.name, "2025.csv"):
-                st.success("✅ CSV-Datei wurde erfolgreich als **2025.csv** per FTP hochgeladen.")
-            else:
-                st.warning("⚠️ CSV-Datei konnte nicht per FTP hochgeladen werden.")
+            # Fortschrittsanzeige vorbereiten
+            progress_bar = st.progress(0)
 
-            # Download-Button anzeigen
+            # Upload, wenn Checkbox aktiv ist
+            if upload_aktiv:
+                st.write("🔄 Hochladen läuft...")
+                upload_ok = upload_via_ftp(
+                    tmp.name,
+                    "2025.csv",
+                    progress_callback=lambda p: progress_bar.progress(p)
+                )
+                if upload_ok:
+                    st.success("✅ CSV-Datei wurde erfolgreich als 2025.csv per FTP hochgeladen.")
+                else:
+                    st.warning("⚠️ Upload nicht erfolgreich.")
+            else:
+                st.info("☑️ Upload nicht aktiviert. CSV wird nur lokal angeboten.")
+
+            # Download anbieten
             with open(tmp.name, "r", encoding="utf-8") as f:
                 st.download_button("⬇️ CSV-Datei herunterladen", f.read(), file_name="2025.csv", mime="text/csv")
 
-        # Tabelle anzeigen
         st.dataframe(df_auswertung)
     else:
         st.warning("Keine gültigen LKW-Fahrten gefunden.")
